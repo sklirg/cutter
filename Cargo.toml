@@ -1,0 +1,8 @@
+[package]
+name = "cutter"
+version = "0.1.0"
+authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+raster = "*"

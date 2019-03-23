@@ -1,8 +1,9 @@
 [package]
 name = "cutter"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 raster = "*"
+rust-s3 = "0.12.1"

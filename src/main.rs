@@ -1,60 +1,152 @@
 use std::env;
 use std::fs;
+use std::fs::{File};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process;
+use std::str;
+
+use s3::bucket::Bucket;
+use s3::credentials::Credentials;
+use s3::error::S3Result;
 
 extern crate raster;
 
+const DEFAULT_REGION: &str = "eu-central-1";
+
+#[derive(Debug)]
+struct Config {
+    files_path: String,
+    overwrite: bool,
+    s3_bucket_name: String,
+    s3_region: String,
+    s3_prefix: String,
+}
+
 fn main() {
-    let filepath = process_args();
+    let config = process_args();
     // if args.len() == 1 {
     //     eprintln!("Missing path argument! Simply supply it after the binary.");
     //     process::exit(1);
     // }
 
-    // let filepath = &args[1];
+    // let config = &args[1];
 
-    println!("Path arg: {}", filepath);
+    println!("Executing with config: {:?}", config);
 
-    let files = get_files_in_dir(&filepath);
+    if config.s3_bucket_name != "" {
+        download_from_s3(&config);
+    }
 
-    transform_images(files, &filepath);
+    let files = get_files_in_dir(&config.files_path);
+
+    let processed_files = transform_images(files, &config.files_path);
+
+    upload_to_s3(&config, processed_files);
 
     println!("Done!")
 }
 
 // App config
-fn process_args() -> String {
+fn process_args() -> Config {
     let args: Vec<String> = env::args().collect();
 
     match args.len() {
         1...2 => panic!("Missing args"),
-        // 2 => println!("Missing args"),
-        3 => process_two_args(args),
+        3...4 => return process_two_args(args),
         _ => panic!("Yikes"),
     }
 }
 
-fn process_two_args(args: Vec<String>) -> String {
+fn process_two_args(args: Vec<String>) -> Config {
     let first_arg = &args[1];
 
+    let mut config: Config = Config {
+        files_path: "".to_owned(),
+        overwrite: false,
+        s3_bucket_name: "".to_owned(),
+        s3_prefix: "".to_owned(),
+        s3_region: DEFAULT_REGION.to_owned(),
+    };
+
     match first_arg.as_str() {
-        "path" => return args[1].to_owned(),
-        "s3" => return download_from_s3(&args[2]),
+        "path" => {
+            config.files_path = args[2].to_owned();
+        }
+        "s3" => {
+            config.files_path = args[2].to_owned();
+            config.s3_bucket_name = args[2].to_owned();
+            if args.len() == 4 {
+                config.s3_prefix = args[3].to_owned();
+            }
+        }
         _ => panic!("Unknown operation"),
     }
-}
 
-fn download_from_s3(bucket: &str) -> String {
-    println!("Downloading files from S3 bucket '{}'...", bucket);
-    // @ ToDo
-    return "local_path".to_owned();
+    return config;
 }
 // End config
 
-fn transform_images(files: Vec<String>, output_path: &str) {
+fn download_from_s3(config: &Config) {
+    println!("Downloading files from S3 bucket '{}' ({})...", &config.s3_bucket_name, &config.s3_prefix);
+    let credentials = Credentials::default();
+    let bucket = Bucket::new(&config.s3_bucket_name, config.s3_region.parse().unwrap(), credentials).unwrap();
+    let bucket_contents = bucket.list(&config.s3_prefix, None).unwrap();
+
+    let mut all_files = Vec::new();
+
+    for (list, code) in bucket_contents {
+        for obj in list.contents {
+            all_files.push(obj.key);
+        }
+    }
+
+    let mut files = Vec::new();
+
+    let mut skipped = 0;
+
+    for file in &all_files {
+        let thumb_key = &file.replace(".jpg", "_thumb.jpg");
+        if !&file.contains("_thumb")
+            && file.contains(".jpg")
+            // Skip files with existing thumbs
+            && !all_files.contains(thumb_key) {
+                files.push(file);
+        }
+        else {
+            skipped += 1;
+        }
+    }
+
+    if config.overwrite || !Path::new(&config.s3_prefix).exists() {
+        fs::create_dir(&config.s3_prefix).unwrap();
+    }
+
+    println!("Downloading {} files to {} (skipped {})", files.len(), &config.s3_prefix, skipped);
+    for file in &files {
+        let (data, code) = &bucket.get(&file).unwrap();
+        let mut buffer = File::create(&file.to_owned()).unwrap();
+        buffer.write(data);
+    }
+}
+
+fn upload_to_s3(config: &Config, files: Vec<String>) {
+    let credentials = Credentials::default();
+    let bucket = Bucket::new(&config.s3_bucket_name, config.s3_region.parse().unwrap(), credentials).unwrap();
+
+    println!("Uploading {} files to S3 bucket '{}'", files.len(), &config.s3_bucket_name);
+    for file in &files {
+        let mut buf = Vec::new();
+        let data = File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
+        bucket.put(file, &buf, "image/jpeg");
+    }
+}
+
+fn transform_images(files: Vec<String>, output_path: &str) -> Vec<String> {
     let numfiles = files.len().to_owned();
     println!("Processing {} files", numfiles);
+
+    let mut created_files = Vec::new();
 
     let mut counter = 0;
     for f in files {
@@ -63,14 +155,17 @@ fn transform_images(files: Vec<String>, output_path: &str) {
             println!("... {}/{}", counter, numfiles);
         }
         let thumb_path = format!(
-            "{}-thumbs/{}",
+            "{}/{}",
             output_path,
             generate_thumb_path(&get_file_name(&f), "jpg")
         );
         let mut image = raster::open(&f).unwrap();
         transform_image(&mut image);
         save_image(&image, &thumb_path);
+        created_files.push(thumb_path);
     }
+
+    return created_files;
 }
 
 fn transform_image(image: &mut raster::Image) {

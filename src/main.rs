@@ -4,7 +4,6 @@ use std::fs;
 use std::fs::{File};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process;
 use std::str;
 
 use s3::bucket::Bucket;
@@ -25,12 +24,6 @@ struct Config {
 
 fn main() {
     let config = process_args();
-    // if args.len() == 1 {
-    //     eprintln!("Missing path argument! Simply supply it after the binary.");
-    //     process::exit(1);
-    // }
-
-    // let config = &args[1];
 
     println!("Executing with config: {:?}", config);
 

@@ -15,6 +15,7 @@ const DEFAULT_REGION: &str = "eu-central-1";
 
 #[derive(Debug)]
 struct Config {
+    clean: bool,
     files_path: String,
     overwrite: bool,
     s3_bucket_name: String,
@@ -26,6 +27,12 @@ fn main() {
     let config = process_args();
 
     println!("Executing with config: {:?}", config);
+
+    if Path::new(&config.s3_prefix).exists() && (config.clean || config.overwrite) {
+        fs::remove_dir_all(&config.s3_prefix).unwrap();
+    }
+
+    fs::create_dir(&config.s3_prefix).unwrap();
 
     if config.s3_bucket_name != "" {
         download_from_s3(&config);
@@ -55,6 +62,7 @@ fn process_two_args(args: Vec<String>) -> Config {
     let first_arg = &args[1];
 
     let mut config: Config = Config {
+        clean: true,
         files_path: "".to_owned(),
         overwrite: false,
         s3_bucket_name: "".to_owned(),
@@ -110,10 +118,6 @@ fn download_from_s3(config: &Config) {
         else {
             skipped += 1;
         }
-    }
-
-    if config.overwrite || !Path::new(&config.s3_prefix).exists() {
-        fs::create_dir(&config.s3_prefix).unwrap();
     }
 
     println!("Downloading {} files to {} (skipped {})", files.len(), &config.s3_prefix, skipped);

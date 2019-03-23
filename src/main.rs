@@ -19,11 +19,16 @@ fn main() {
 
     let files = get_files_in_dir(filepath);
 
+    transform_images(files, &filepath);
+
+    println!("Done!")
+}
+
+fn transform_images(files: Vec<String>, output_path: &str) {
     let numfiles = files.len().to_owned();
     println!("Processing {} files", numfiles);
 
     let mut counter = 0;
-
     for f in files {
         counter += 1;
         if counter % 10 == 0 {
@@ -31,17 +36,13 @@ fn main() {
         }
         let thumb_path = format!(
             "{}-thumbs/{}",
-            filepath,
+            output_path,
             generate_thumb_path(&get_file_name(&f), "jpg")
         );
         let mut image = raster::open(&f).unwrap();
         transform_image(&mut image);
         save_image(&image, &thumb_path);
     }
-
-    // let mut image = raster::open(filepath).unwrap();
-
-    // let file_name = get_file_name(filepath);
 }
 
 fn transform_image(image: &mut raster::Image) {

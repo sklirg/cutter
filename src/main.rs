@@ -6,23 +6,51 @@ use std::process;
 extern crate raster;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let filepath = process_args();
+    // if args.len() == 1 {
+    //     eprintln!("Missing path argument! Simply supply it after the binary.");
+    //     process::exit(1);
+    // }
 
-    if args.len() == 1 {
-        eprintln!("Missing path argument! Simply supply it after the binary.");
-        process::exit(1);
-    }
-
-    let filepath = &args[1];
+    // let filepath = &args[1];
 
     println!("Path arg: {}", filepath);
 
-    let files = get_files_in_dir(filepath);
+    let files = get_files_in_dir(&filepath);
 
     transform_images(files, &filepath);
 
     println!("Done!")
 }
+
+// App config
+fn process_args() -> String {
+    let args: Vec<String> = env::args().collect();
+
+    match args.len() {
+        1...2 => panic!("Missing args"),
+        // 2 => println!("Missing args"),
+        3 => process_two_args(args),
+        _ => panic!("Yikes"),
+    }
+}
+
+fn process_two_args(args: Vec<String>) -> String {
+    let first_arg = &args[1];
+
+    match first_arg.as_str() {
+        "path" => return args[1].to_owned(),
+        "s3" => return download_from_s3(&args[2]),
+        _ => panic!("Unknown operation"),
+    }
+}
+
+fn download_from_s3(bucket: &str) -> String {
+    println!("Downloading files from S3 bucket '{}'...", bucket);
+    // @ ToDo
+    return "local_path".to_owned();
+}
+// End config
 
 fn transform_images(files: Vec<String>, output_path: &str) {
     let numfiles = files.len().to_owned();

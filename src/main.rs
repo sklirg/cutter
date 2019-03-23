@@ -77,6 +77,7 @@ fn process_two_args(args: Vec<String>) -> Config {
             config.files_path = args[2].to_owned();
             config.s3_bucket_name = args[2].to_owned();
             if args.len() == 4 {
+                config.files_path = args[3].to_owned();
                 config.s3_prefix = args[3].to_owned();
             }
         }

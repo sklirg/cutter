@@ -6,8 +6,10 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
 
+use lambda_runtime::{error::HandlerError, lambda, Context};
 use s3::bucket::Bucket;
 use s3::credentials::Credentials;
+use serde::{Deserialize, Serialize};
 
 extern crate raster;
 
@@ -23,12 +25,23 @@ struct Config {
     s3_prefix: String,
 }
 
-fn main() {
-    let config = process_args();
+#[derive(Debug,Deserialize)]
+struct LambdaEvent {
+    bucket: String,
+    prefix: String,
 
+}
+
+#[derive(Serialize)]
+struct LambdaOutput {
+    message: String,
+}
+
+fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
     if Path::new(&config.s3_prefix).exists() && (config.clean || config.overwrite) {
+        println!("Removing existing directory...")
         fs::remove_dir_all(&config.s3_prefix).unwrap();
     }
 
@@ -44,7 +57,40 @@ fn main() {
 
     upload_to_s3(&config, processed_files);
 
-    println!("Done!")
+    println!("Done!");
+}
+
+fn main() {
+    let config = process_args();
+    run(&config);
+}
+
+fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {
+    if event.bucket == "" {
+        eprintln!("Missing bucket name");
+        panic!("Missing bucket name");
+    }
+
+    let mut path = event.bucket.to_owned();
+
+    if event.prefix != "" {
+        path = event.prefix.to_owned();
+    }
+
+    let config = Config {
+        clean: true,
+        files_path: event.prefix.to_owned(),
+        overwrite: true,
+        s3_bucket_name: event.bucket.to_owned(),
+        s3_prefix: event.prefix.to_owned(),
+        s3_region: DEFAULT_REGION.to_owned(),
+    };
+
+    run(&config);
+
+    Ok(LambdaOutput {
+        message: format!("Success!"),
+    })
 }
 
 // App config

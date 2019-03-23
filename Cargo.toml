@@ -5,5 +5,7 @@ authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+lambda_runtime = "0.2.0"
 raster = "*"
 rust-s3 = "0.12.1"
+serde = { version = "1.0", features = ["derive"] }

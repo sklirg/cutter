@@ -9,7 +9,6 @@ use std::str;
 
 use s3::bucket::Bucket;
 use s3::credentials::Credentials;
-use s3::error::S3Result;
 
 extern crate raster;
 
@@ -96,7 +95,7 @@ fn download_from_s3(config: &Config) {
 
     let mut all_files = Vec::new();
 
-    for (list, code) in bucket_contents {
+    for (list, _) in bucket_contents {
         for obj in list.contents {
             all_files.push(obj.key);
         }

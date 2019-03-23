@@ -1,3 +1,4 @@
+use std::cmp;
 use std::env;
 use std::fs;
 use std::fs::{File};
@@ -123,10 +124,15 @@ fn download_from_s3(config: &Config) {
     }
 
     println!("Downloading {} files to {} (skipped {})", files.len(), &config.s3_prefix, skipped);
+    let numfiles = files.len();
+    let mut counter = 0;
+
     for file in &files {
-        let (data, code) = &bucket.get(&file).unwrap();
+        print_list_iter_status(counter, numfiles as u32, "Downloaded");
+        let (data, _) = &bucket.get(&file).unwrap();
         let mut buffer = File::create(&file.to_owned()).unwrap();
-        buffer.write(data);
+        buffer.write(data).unwrap();
+        counter += 1;
     }
 }
 
@@ -135,10 +141,14 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
     let bucket = Bucket::new(&config.s3_bucket_name, config.s3_region.parse().unwrap(), credentials).unwrap();
 
     println!("Uploading {} files to S3 bucket '{}'", files.len(), &config.s3_bucket_name);
+    let mut counter = 0;
+    let numfiles = files.len();
     for file in &files {
+        print_list_iter_status(counter, numfiles as u32, "Uploaded");
         let mut buf = Vec::new();
-        let data = File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
-        bucket.put(file, &buf, "image/jpeg");
+        File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
+        bucket.put(file, &buf, "image/jpeg").unwrap();
+        counter += 1;
     }
 }
 
@@ -150,10 +160,7 @@ fn transform_images(files: Vec<String>, output_path: &str) -> Vec<String> {
 
     let mut counter = 0;
     for f in files {
-        counter += 1;
-        if counter % 10 == 0 {
-            println!("... {}/{}", counter, numfiles);
-        }
+        print_list_iter_status(counter, numfiles as u32, "Processed");
         let thumb_path = format!(
             "{}/{}",
             output_path,
@@ -163,6 +170,7 @@ fn transform_images(files: Vec<String>, output_path: &str) -> Vec<String> {
         transform_image(&mut image);
         save_image(&image, &thumb_path);
         created_files.push(thumb_path);
+        counter += 1;
     }
 
     return created_files;
@@ -200,4 +208,12 @@ fn get_files_in_dir(dirpath: &str) -> Vec<String> {
     }
 
     return files;
+}
+
+fn print_list_iter_status(current: u32, len: u32, prefix: &str) {
+    let total = len - 1;
+    let threshold = cmp::max(1, cmp::min(25, len * 25 / 100));
+    if current == 0 || current == total || current % threshold == 0 {
+        println!("{} {}/{}", prefix, current, total);
+    }
 }

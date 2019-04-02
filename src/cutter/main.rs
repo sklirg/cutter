@@ -27,14 +27,14 @@ struct Config {
 }
 
 #[derive(Debug,Deserialize)]
-struct LambdaEvent {
+pub struct LambdaEvent {
     bucket: String,
     prefix: String,
 
 }
 
 #[derive(Serialize)]
-struct LambdaOutput {
+pub struct LambdaOutput {
     message: String,
 }
 
@@ -61,17 +61,12 @@ fn run(config: &Config) {
     println!("Done!");
 }
 
-fn main() {
+pub fn main() {
     let config = process_args();
     run(&config);
 }
 
-fn main2() -> Result<(), Box<dyn Error>> {
-    lambda!(lambda_handler);
-    Ok(())
-}
-
-fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {
+pub fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {
     if event.bucket == "" {
         eprintln!("Missing bucket name");
         panic!("Missing bucket name");

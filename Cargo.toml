@@ -4,6 +4,14 @@ version = "0.2.0"
 authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
 edition = "2018"
 
+[[bin]]
+path = "src/main.rs"
+name = "cutter"
+
+[[bin]]
+path = "src/lambda.rs"
+name = "cutter-lambda"
+
 [dependencies]
 lambda_runtime = "0.2.0"
 raster = "*"

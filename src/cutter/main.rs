@@ -1,5 +1,6 @@
 use std::cmp;
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::fs::{File};
 use std::io::{Read, Write};
@@ -63,6 +64,11 @@ fn run(config: &Config) {
 fn main() {
     let config = process_args();
     run(&config);
+}
+
+fn main2() -> Result<(), Box<dyn Error>> {
+    lambda!(lambda_handler);
+    Ok(())
 }
 
 fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {

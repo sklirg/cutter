@@ -41,7 +41,7 @@ fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
     if Path::new(&config.s3_prefix).exists() && (config.clean || config.overwrite) {
-        println!("Removing existing directory...")
+        println!("Removing existing directory...");
         fs::remove_dir_all(&config.s3_prefix).unwrap();
     }
 

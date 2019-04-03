@@ -24,6 +24,7 @@ struct Config {
     s3_bucket_name: String,
     s3_region: String,
     s3_prefix: String,
+    tmp_dir: String,
 }
 
 #[derive(Debug,Deserialize)]
@@ -41,12 +42,13 @@ pub struct LambdaOutput {
 fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
-    if Path::new(&config.s3_prefix).exists() && (config.clean || config.overwrite) {
+    if Path::new(&config.tmp_dir).exists() && (config.clean || config.overwrite) {
         println!("Removing existing directory...");
-        fs::remove_dir_all(&config.s3_prefix).unwrap();
+        fs::remove_dir_all(&config.tmp_dir).unwrap();
     }
 
-    fs::create_dir(&config.s3_prefix).unwrap();
+    println!("Tmp path {}", &config.tmp_dir);
+    fs::create_dir(&config.tmp_dir).unwrap();
 
     if config.s3_bucket_name != "" {
         download_from_s3(&config);
@@ -79,12 +81,13 @@ pub fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutp
     }
 
     let config = Config {
-        clean: true,
-        files_path: event.prefix.to_owned(),
-        overwrite: true,
+        clean: false,
+        files_path: format!("/tmp/{}/{}", event.bucket, event.prefix),
+        overwrite: false,
         s3_bucket_name: event.bucket.to_owned(),
         s3_prefix: event.prefix.to_owned(),
         s3_region: DEFAULT_REGION.to_owned(),
+        tmp_dir: format!("/tmp/{}", event.bucket),
     };
 
     run(&config);
@@ -115,6 +118,7 @@ fn process_two_args(args: Vec<String>) -> Config {
         s3_bucket_name: "".to_owned(),
         s3_prefix: "".to_owned(),
         s3_region: DEFAULT_REGION.to_owned(),
+        tmp_dir: "/tmp/cutter".to_owned(),
     };
 
     match first_arg.as_str() {
@@ -122,10 +126,11 @@ fn process_two_args(args: Vec<String>) -> Config {
             config.files_path = args[2].to_owned();
         }
         "s3" => {
-            config.files_path = args[2].to_owned();
-            config.s3_bucket_name = args[2].to_owned();
+            config.tmp_dir = format!("/tmp/{}", args[2]);
+            config.files_path = config.tmp_dir.to_owned();
+            config.s3_bucket_name = args[2].to_owned().to_owned();
             if args.len() == 4 {
-                config.files_path = args[3].to_owned();
+                config.files_path = format!("{}/{}", config.tmp_dir, args[3]);
                 config.s3_prefix = args[3].to_owned();
             }
         }
@@ -171,10 +176,18 @@ fn download_from_s3(config: &Config) {
     let numfiles = files.len();
     let mut counter = 0;
 
+    let root_dir = format!("{}/{}", &config.tmp_dir, &config.s3_prefix);
+    if Path::new(&root_dir).exists() && (config.clean || config.overwrite) {
+        println!("Removing existing directory...");
+        fs::remove_dir_all(&root_dir).unwrap();
+    }
+    fs::create_dir_all(&root_dir).unwrap();
+
     for file in &files {
+        let path = format!("{}/{}", &config.tmp_dir, &file);
         print_list_iter_status(counter, numfiles as u32, "Downloaded");
         let (data, _) = &bucket.get(&file).unwrap();
-        let mut buffer = File::create(&file.to_owned()).unwrap();
+        let mut buffer = File::create(&path.to_owned()).unwrap();
         buffer.write(data).unwrap();
         counter += 1;
     }

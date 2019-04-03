@@ -54,6 +54,7 @@ fn run(config: &Config) {
         download_from_s3(&config);
     }
 
+    println!("Finding files in {}", &config.files_path);
     let files = get_files_in_dir(&config.files_path);
 
     let processed_files = transform_images(files, &config.files_path);

@@ -205,7 +205,7 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
         print_list_iter_status(counter, numfiles as u32, "Uploaded");
         let mut buf = Vec::new();
         File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
-        bucket.put(file, &buf, "image/jpeg").unwrap();
+        bucket.put(&file.replace(&config.tmp_dir, ""), &buf, "image/jpeg").unwrap();
         counter += 1;
     }
 }

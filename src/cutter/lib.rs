@@ -53,6 +53,8 @@ pub fn run(config: &Config) {
     println!("Done!");
 }
 
+// Public entrypoint for lib
+#[allow(dead_code)]
 pub fn main() {
     let config = process_args();
     run(&config);

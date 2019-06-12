@@ -24,7 +24,7 @@ pub struct LambdaOutput {
     message: String,
 }
 
-fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {
+fn lambda_handler(event: LambdaEvent, _context: Context) -> Result<LambdaOutput, HandlerError> {
     if event.bucket == "" {
         eprintln!("Missing bucket name");
         panic!("Missing bucket name");
@@ -42,7 +42,7 @@ fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, 
         files_path: format!("/tmp/{}/{}", event.bucket, event.prefix),
         overwrite: false,
         s3_bucket_name: event.bucket.to_owned(),
-        s3_prefix: event.prefix.to_owned(),
+        s3_prefix: path,
         s3_region: DEFAULT_REGION.to_owned(),
         tmp_dir: format!("/tmp/{}", event.bucket),
     };

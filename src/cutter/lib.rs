@@ -94,22 +94,43 @@ fn process_args() -> Config {
                 .takes_value(true)
                 .help("Used to filter the start of the s3 object key"),
         )
+        .arg(
+            Arg::with_name("overwrite")
+                .short("o")
+                .long("overwrite")
+                .takes_value(true)
+                .help("Whether to overwrite files already present on the remote or not"),
+        )
         .get_matches();
 
-    let local_path = process_arg_with_default(matches.value_of("path"), "");
+    let tmp_dir = "/tmp/cutter";
+
+    let local_path = process_arg_with_default(matches.value_of("path"), tmp_dir);
     let s3_bucket = process_arg_with_default(matches.value_of("s3-bucket"), "");
     let s3_prefix = process_arg_with_default(matches.value_of("s3-prefix"), "");
     let fetch_remote = process_arg_with_default(matches.value_of("fetch-remote"), "") == "true";
+    let overwrite = process_arg_with_default(matches.value_of("overwrite"), "") == "true";
 
     if local_path == "" && (fetch_remote && s3_bucket == "") {
         panic!("Missing required arguments to run.");
     }
 
+    let mut files_path = local_path;
+
+    if fetch_remote {
+        let mut prefix_path = s3_prefix.to_owned();
+        if prefix_path.contains("/") {
+            let splits: Vec<&str> = prefix_path.split("/").collect::<Vec<&str>>();
+            prefix_path = splits[0].to_owned();
+        }
+        files_path = format!("{}/{}", files_path, prefix_path);
+    }
+
     let config: Config = Config {
         clean: true,
         fetch_remote: fetch_remote,
-        files_path: local_path.to_owned(),
-        overwrite: false,
+        files_path: files_path.to_owned(),
+        overwrite: overwrite,
         s3_bucket_name: s3_bucket,
         s3_prefix: s3_prefix.to_owned(),
         s3_region: DEFAULT_REGION.to_owned(),
@@ -154,10 +175,10 @@ fn download_from_s3(config: &Config) {
 
     for file in &all_files {
         let thumb_key = &file.replace(".jpg", "_thumb.jpg");
-        if !&file.contains("_thumb")
-            && file.contains(".jpg")
-            // Skip files with existing thumbs
-            && !all_files.contains(thumb_key)
+        if file != ""
+            && file != &format!("{}/", &config.s3_prefix)
+            && (config.overwrite && !file.contains("_"))
+            || (!config.overwrite && !all_files.contains(thumb_key))
         {
             files.push(file);
         } else {
@@ -165,16 +186,17 @@ fn download_from_s3(config: &Config) {
         }
     }
 
+    let root_dir = config.files_path.to_owned();
+
     println!(
         "Downloading {} files to {} (skipped {})",
         files.len(),
-        &config.s3_prefix,
+        &root_dir,
         skipped
     );
     let numfiles = files.len();
     let mut counter = 0;
 
-    let root_dir = format!("{}/{}", &config.tmp_dir, &config.s3_prefix);
     if Path::new(&root_dir).exists() && (config.clean || config.overwrite) {
         println!("Removing existing directory...");
         fs::remove_dir_all(&root_dir).unwrap();
@@ -182,7 +204,11 @@ fn download_from_s3(config: &Config) {
     fs::create_dir_all(&root_dir).unwrap();
 
     for file in &files {
-        let path = format!("{}/{}", &config.tmp_dir, &file);
+        let gallery_image: Vec<&str> = file.split("/").collect();
+        let mut path = format!("{}/{}", &config.files_path, &file);
+        if gallery_image.len() > 1 {
+            path = format!("{}/{}", &config.files_path, &gallery_image[1]);
+        }
         print_list_iter_status(counter, numfiles as u32, "Downloaded");
         let (data, _) = &bucket.get(&file).unwrap();
         let mut buffer = File::create(&path.to_owned()).unwrap();
@@ -211,6 +237,9 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
         print_list_iter_status(counter, numfiles as u32, "Uploaded");
         let mut buf = Vec::new();
         File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
+        // @ToDo: Fix output if files are served locally.
+        // They're currently prefixed with the folder name sent in through config
+        // But need the prefix from S3.
         bucket
             .put(&file.replace(&config.tmp_dir, ""), &buf, "image/jpeg")
             .unwrap();

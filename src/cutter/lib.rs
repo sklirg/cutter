@@ -285,7 +285,11 @@ fn get_files_in_dir(dirpath: &str) -> Vec<String> {
     let mut files = Vec::new();
     if dir.is_dir() {
         for entry in fs::read_dir(dir).unwrap() {
-            files.push(entry.unwrap().path().to_str().unwrap().to_owned());
+            let filename = entry.unwrap().path().to_str().unwrap().to_owned();
+            // Skip filenames with _ in them as that's used to denote file sizes/formats.
+            if !filename.contains("_") {
+                files.push(filename);
+            }
         }
     }
 

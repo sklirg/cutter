@@ -1,44 +1,32 @@
 use std::cmp;
-use std::env;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
 
-use lambda_runtime::{error::HandlerError, lambda, Context};
+use clap::{App, Arg};
 use s3::bucket::Bucket;
 use s3::credentials::Credentials;
-use serde::{Deserialize, Serialize};
 
+extern crate clap;
 extern crate raster;
 
-const DEFAULT_REGION: &str = "eu-central-1";
+pub const DEFAULT_REGION: &str = "eu-central-1";
 
 #[derive(Debug)]
-struct Config {
-    clean: bool,
-    files_path: String,
-    overwrite: bool,
-    s3_bucket_name: String,
-    s3_region: String,
-    s3_prefix: String,
-    tmp_dir: String,
+pub struct Config {
+    pub clean: bool,
+    pub fetch_remote: bool,
+    pub files_path: String,
+    pub overwrite: bool,
+    pub s3_bucket_name: String,
+    pub s3_region: String,
+    pub s3_prefix: String,
+    pub tmp_dir: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct LambdaEvent {
-    bucket: String,
-    prefix: String,
-}
-
-#[derive(Serialize)]
-pub struct LambdaOutput {
-    message: String,
-}
-
-fn run(config: &Config) {
+pub fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
     if Path::new(&config.tmp_dir).exists() && (config.clean || config.overwrite) {
@@ -49,7 +37,7 @@ fn run(config: &Config) {
     println!("Tmp path {}", &config.tmp_dir);
     fs::create_dir(&config.tmp_dir).unwrap();
 
-    if config.s3_bucket_name != "" {
+    if config.fetch_remote && config.s3_bucket_name != "" {
         download_from_s3(&config);
     }
 
@@ -58,7 +46,9 @@ fn run(config: &Config) {
 
     let processed_files = transform_images(files, &config.files_path);
 
-    upload_to_s3(&config, processed_files);
+    if config.s3_bucket_name != "" {
+        upload_to_s3(&config, processed_files);
+    }
 
     println!("Done!");
 }
@@ -68,76 +58,69 @@ pub fn main() {
     run(&config);
 }
 
-pub fn lambda_handler(event: LambdaEvent, context: Context) -> Result<LambdaOutput, HandlerError> {
-    if event.bucket == "" {
-        eprintln!("Missing bucket name");
-        panic!("Missing bucket name");
-    }
-
-    let mut path = event.bucket.to_owned();
-
-    if event.prefix != "" {
-        path = event.prefix.to_owned();
-    }
-
-    let config = Config {
-        clean: false,
-        files_path: format!("/tmp/{}/{}", event.bucket, event.prefix),
-        overwrite: false,
-        s3_bucket_name: event.bucket.to_owned(),
-        s3_prefix: event.prefix.to_owned(),
-        s3_region: DEFAULT_REGION.to_owned(),
-        tmp_dir: format!("/tmp/{}", event.bucket),
-    };
-
-    run(&config);
-
-    Ok(LambdaOutput {
-        message: format!("Success!"),
-    })
-}
-
 // App config
 fn process_args() -> Config {
-    let args: Vec<String> = env::args().collect();
+    let matches = App::new("Cutter")
+        .version("0.3.0")
+        .author("Sklirg")
+        .about("Image cropping tool")
+        .arg(
+            Arg::with_name("path")
+                .short("p")
+                .long("path")
+                .takes_value(true)
+                .help("Local file path of gallery to generate crops for"),
+        )
+        .arg(
+            Arg::with_name("s3-bucket")
+                .short("b")
+                .long("s3-bucket")
+                .takes_value(true)
+                .help("S3 bucket to sync files to (and fetch from, if --fetch-remote is specified"),
+        )
+        .arg(
+            Arg::with_name("fetch-remote")
+                .short("r")
+                .long("fetch-remote")
+                .takes_value(true)
+                .help("Fetch images from S3 bucket specified in --s3-bucket")
+                .default_value("false"),
+        )
+        .arg(
+            Arg::with_name("s3-prefix")
+                .long("s3-prefix")
+                .takes_value(true)
+                .help("Used to filter the start of the s3 object key"),
+        )
+        .get_matches();
 
-    match args.len() {
-        1...2 => panic!("Missing args"),
-        3...4 => return process_two_args(args),
-        _ => panic!("Yikes"),
+    let local_path = process_arg_with_default(matches.value_of("path"), "");
+    let s3_bucket = process_arg_with_default(matches.value_of("s3-bucket"), "");
+    let s3_prefix = process_arg_with_default(matches.value_of("s3-prefix"), "");
+    let fetch_remote = process_arg_with_default(matches.value_of("fetch-remote"), "") == "true";
+
+    if local_path == "" && (fetch_remote && s3_bucket == "") {
+        panic!("Missing required arguments to run.");
     }
-}
 
-fn process_two_args(args: Vec<String>) -> Config {
-    let first_arg = &args[1];
-
-    let mut config: Config = Config {
+    let config: Config = Config {
         clean: true,
-        files_path: "".to_owned(),
+        fetch_remote: fetch_remote,
+        files_path: local_path.to_owned(),
         overwrite: false,
-        s3_bucket_name: "".to_owned(),
-        s3_prefix: "".to_owned(),
+        s3_bucket_name: s3_bucket,
+        s3_prefix: s3_prefix.to_owned(),
         s3_region: DEFAULT_REGION.to_owned(),
         tmp_dir: "/tmp/cutter".to_owned(),
     };
-
-    match first_arg.as_str() {
-        "path" => {
-            config.files_path = args[2].to_owned();
-        }
-        "s3" => {
-            config.tmp_dir = format!("/tmp/{}", args[2]);
-            config.files_path = config.tmp_dir.to_owned();
-            config.s3_bucket_name = args[2].to_owned().to_owned();
-            if args.len() == 4 {
-                config.files_path = format!("{}/{}", config.tmp_dir, args[3]);
-                config.s3_prefix = args[3].to_owned();
-            }
-        }
-        _ => panic!("Unknown operation"),
-    }
-
     return config;
+}
+
+fn process_arg_with_default(arg: Option<&str>, default: &str) -> String {
+    match arg {
+        None => return default.to_owned(),
+        Some(s) => return s.to_owned(),
+    };
 }
 // End config
 

@@ -2,7 +2,7 @@ use std::cmp;
 use std::env;
 use std::error::Error;
 use std::fs;
-use std::fs::{File};
+use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
@@ -27,11 +27,10 @@ struct Config {
     tmp_dir: String,
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LambdaEvent {
     bucket: String,
     prefix: String,
-
 }
 
 #[derive(Serialize)]
@@ -143,9 +142,17 @@ fn process_two_args(args: Vec<String>) -> Config {
 // End config
 
 fn download_from_s3(config: &Config) {
-    println!("Downloading files from S3 bucket '{}' ({})...", &config.s3_bucket_name, &config.s3_prefix);
+    println!(
+        "Downloading files from S3 bucket '{}' ({})...",
+        &config.s3_bucket_name, &config.s3_prefix
+    );
     let credentials = Credentials::default();
-    let bucket = Bucket::new(&config.s3_bucket_name, config.s3_region.parse().unwrap(), credentials).unwrap();
+    let bucket = Bucket::new(
+        &config.s3_bucket_name,
+        config.s3_region.parse().unwrap(),
+        credentials,
+    )
+    .unwrap();
     let bucket_contents = bucket.list(&config.s3_prefix, None).unwrap();
 
     let mut all_files = Vec::new();
@@ -165,15 +172,20 @@ fn download_from_s3(config: &Config) {
         if !&file.contains("_thumb")
             && file.contains(".jpg")
             // Skip files with existing thumbs
-            && !all_files.contains(thumb_key) {
-                files.push(file);
-        }
-        else {
+            && !all_files.contains(thumb_key)
+        {
+            files.push(file);
+        } else {
             skipped += 1;
         }
     }
 
-    println!("Downloading {} files to {} (skipped {})", files.len(), &config.s3_prefix, skipped);
+    println!(
+        "Downloading {} files to {} (skipped {})",
+        files.len(),
+        &config.s3_prefix,
+        skipped
+    );
     let numfiles = files.len();
     let mut counter = 0;
 
@@ -196,16 +208,27 @@ fn download_from_s3(config: &Config) {
 
 fn upload_to_s3(config: &Config, files: Vec<String>) {
     let credentials = Credentials::default();
-    let bucket = Bucket::new(&config.s3_bucket_name, config.s3_region.parse().unwrap(), credentials).unwrap();
+    let bucket = Bucket::new(
+        &config.s3_bucket_name,
+        config.s3_region.parse().unwrap(),
+        credentials,
+    )
+    .unwrap();
 
-    println!("Uploading {} files to S3 bucket '{}'", files.len(), &config.s3_bucket_name);
+    println!(
+        "Uploading {} files to S3 bucket '{}'",
+        files.len(),
+        &config.s3_bucket_name
+    );
     let mut counter = 0;
     let numfiles = files.len();
     for file in &files {
         print_list_iter_status(counter, numfiles as u32, "Uploaded");
         let mut buf = Vec::new();
         File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
-        bucket.put(&file.replace(&config.tmp_dir, ""), &buf, "image/jpeg").unwrap();
+        bucket
+            .put(&file.replace(&config.tmp_dir, ""), &buf, "image/jpeg")
+            .unwrap();
         counter += 1;
     }
 }

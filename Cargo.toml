@@ -13,7 +13,13 @@ path = "src/lambda.rs"
 name = "cutter-lambda"
 target = "x86_64-unknown-linux-musl"
 
+[[bin]]
+path = "src/lambda-basic.rs"
+name = "cutter-lambda-basic"
+target = "x86_64-unknown-linux-musl"
+
 [dependencies]
+clap = "2.33.0"
 lambda_runtime = "0.2.0"
 raster = "*"
 rust-s3 = "0.12.1"

@@ -3,7 +3,7 @@ use std::error::Error;
 use lambda_runtime::{error::HandlerError, lambda, Context};
 use serde::{Deserialize, Serialize};
 
-use cutter::main::{run, Config, DEFAULT_REGION};
+use cutter::lib::{run, Config, DEFAULT_REGION};
 
 mod cutter;
 

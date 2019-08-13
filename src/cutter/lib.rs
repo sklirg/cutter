@@ -35,11 +35,12 @@ pub fn run(config: &Config) {
         explain_config(config);
     }
 
+    if Path::new(&config.tmp_dir).exists() && (config.clean || config.overwrite) {
+        fs::remove_dir_all(&config.tmp_dir).unwrap();
+    }
+
     if !Path::new(&config.tmp_dir).exists() {
         fs::create_dir(&config.tmp_dir).unwrap();
-    }
-    if config.clean || config.overwrite {
-        fs::remove_dir_all(&config.tmp_dir).unwrap();
     }
 
     if config.fetch_remote && config.s3_bucket_name != "" {

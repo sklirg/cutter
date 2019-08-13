@@ -173,12 +173,22 @@ fn download_from_s3(config: &Config) {
     let mut skipped = 0;
 
     for file in &all_files {
-        let thumb_key = &file.replace(".jpg", "_thumb.jpg");
-        if file != ""
-            && file != &format!("{}/", &config.s3_prefix)
-            && (config.overwrite && !file.contains("_"))
-            || (!config.overwrite && !all_files.contains(thumb_key))
+        if file.contains("_200")
+            || file.contains("_400")
+            || file.contains("_800")
+            || file.contains("_1920")
+            || file.contains("_thumb")
         {
+            skipped += 1;
+            continue;
+        }
+
+        let thumb_key = &file.replace(".jpg", "_thumb.jpg");
+
+        let valid_file_name = file != "" && file != &format!("{}/", &config.s3_prefix);
+        let has_sizes = file.contains("_");
+
+        if valid_file_name && (config.overwrite || (!config.overwrite && !has_sizes)) {
             files.push(file);
         } else {
             skipped += 1;
@@ -315,6 +325,7 @@ fn get_files_in_dir(dirpath: &str) -> Vec<String> {
         for entry in fs::read_dir(dir).unwrap() {
             let filename = entry.unwrap().path().to_str().unwrap().to_owned();
             // Skip filenames with _ in them as that's used to denote file sizes/formats.
+            // !! The 400D shot images with names IMG_num so they won't work with this :D
             if !filename.contains("_") {
                 files.push(filename);
             }

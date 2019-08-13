@@ -336,7 +336,7 @@ fn get_files_in_dir(dirpath: &str) -> Vec<String> {
 }
 
 fn print_list_iter_status(current: u32, len: u32, prefix: &str) {
-    let total = len - 1;
+    let total = len;
     let threshold = cmp::max(1, cmp::min(25, len * 25 / 100));
     if current == 0 || current == total || current % threshold == 0 {
         println!("{} {}/{}", prefix, current, total);

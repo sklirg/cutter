@@ -29,13 +29,12 @@ pub struct Config {
 pub fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
-    if Path::new(&config.tmp_dir).exists() && (config.clean || config.overwrite) {
-        println!("Removing existing directory...");
+    if !Path::new(&config.tmp_dir).exists() {
+        fs::create_dir(&config.tmp_dir).unwrap();
+    }
+    if config.clean || config.overwrite {
         fs::remove_dir_all(&config.tmp_dir).unwrap();
     }
-
-    println!("Tmp path {}", &config.tmp_dir);
-    fs::create_dir(&config.tmp_dir).unwrap();
 
     if config.fetch_remote && config.s3_bucket_name != "" {
         download_from_s3(&config);

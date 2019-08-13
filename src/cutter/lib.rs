@@ -23,6 +23,7 @@ pub struct Config {
     pub s3_bucket_name: String,
     pub s3_region: String,
     pub s3_prefix: String,
+    pub crop_sizes: Vec<[i32; 2]>,
     pub tmp_dir: String,
     pub verbose: bool,
 }
@@ -48,7 +49,12 @@ pub fn run(config: &Config) {
     println!("Finding files in {}", &config.files_path);
     let files = get_files_in_dir(&config.files_path);
 
-    let processed_files = transform_images(files, &config.files_path, config.verbose);
+    let processed_files = transform_images(
+        files,
+        &config.files_path,
+        &config.crop_sizes,
+        config.verbose,
+    );
 
     if config.s3_bucket_name != "" {
         upload_to_s3(&config, processed_files);
@@ -93,10 +99,20 @@ fn explain_config(config: &Config) {
     if config.clean {
         println!("Will clean working directory before starting");
     }
+
+    println!(
+        "Will crop to the following {} size(s):",
+        config.crop_sizes.len()
+    );
+    for size in &config.crop_sizes {
+        println!("\t{:?}", size);
+    }
 }
 
 // App config
 fn process_args() -> Config {
+    let default_crop_sizes = ["200x200", "400x400", "800x800", "1920x1080"];
+
     let matches = App::new("Cutter")
         .version("0.3.0")
         .author("Sklirg")
@@ -143,6 +159,14 @@ fn process_args() -> Config {
                 .takes_value(false)
                 .help("Print verbose output to stdout"),
         )
+        .arg(
+            Arg::with_name("size")
+                .short("s")
+                .long("size")
+                .multiple(true)
+                .takes_value(true)
+                .help("Crop sizes specified as WxH (e.g. 200x200) (overrides defaults). Use the argument one time per crop size."),
+        )
         .get_matches();
 
     let tmp_dir = "/tmp/cutter";
@@ -153,6 +177,30 @@ fn process_args() -> Config {
     let fetch_remote = process_arg_with_default(matches.value_of("fetch-remote"), "") == "true";
     let overwrite = process_arg_with_default(matches.value_of("overwrite"), "") == "true";
     let verbose = matches.is_present("verbose");
+    let mut crop_sizes = Vec::new();
+
+    let mut _crop_sizes_options = Vec::new();
+
+    if matches.is_present("size") {
+        for size in matches.values_of("size").unwrap() {
+            _crop_sizes_options.push(size);
+        }
+    } else {
+        _crop_sizes_options = default_crop_sizes.to_vec();
+    }
+
+    for size in _crop_sizes_options {
+        if !size.contains("x") || size.split("x").collect::<Vec<&str>>().len() != 2 {
+            panic!("Invalid sizes configuration. Use the expected format: WIDTHxHEIGHT, e.g.: 1920x1080");
+        }
+
+        let height_str = size.split("x").collect::<Vec<&str>>()[1];
+        let width_str = size.split("x").collect::<Vec<&str>>()[0];
+
+        let height: i32 = height_str.parse().unwrap();
+        let width: i32 = width_str.parse().unwrap();
+        crop_sizes.push([width, height]);
+    }
 
     if local_path == "" && (fetch_remote && s3_bucket == "") {
         panic!("Missing required arguments to run.");
@@ -171,6 +219,7 @@ fn process_args() -> Config {
 
     let config: Config = Config {
         clean: true,
+        crop_sizes: crop_sizes.to_vec(),
         fetch_remote: fetch_remote,
         files_path: files_path.to_owned(),
         overwrite: overwrite,
@@ -301,25 +350,21 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
     }
 }
 
-fn transform_images(files: Vec<String>, output_path: &str, verbose: bool) -> Vec<String> {
+fn transform_images(
+    files: Vec<String>,
+    output_path: &str,
+    sizes: &Vec<[i32; 2]>,
+    verbose: bool,
+) -> Vec<String> {
     let numfiles = files.len().to_owned();
     println!("Processing {} files", numfiles);
-
-    let sizes = vec![
-        // Thumbs
-        vec![200, 200],
-        vec![400, 400],
-        vec![800, 800],
-        // Full size preview
-        vec![1920, 1080],
-    ];
 
     let mut created_files = Vec::new();
 
     let mut counter = 0;
     for f in files {
         print_list_iter_status(counter, numfiles as u32, "Processed", verbose);
-        for size in &sizes {
+        for size in sizes {
             let width = size[0];
             let height = size[1];
             let image = transform_image(&f, width, height);

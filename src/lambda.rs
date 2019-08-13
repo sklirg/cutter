@@ -36,8 +36,18 @@ fn lambda_handler(event: LambdaEvent, _context: Context) -> Result<LambdaOutput,
         path = event.prefix.to_owned();
     }
 
+    let sizes = vec![
+        // Thumbs
+        [200, 200],
+        [400, 400],
+        [800, 800],
+        // Full size preview
+        [1920, 1080],
+    ];
+
     let config = Config {
         clean: false,
+        crop_sizes: sizes,
         fetch_remote: true,
         files_path: format!("/tmp/{}/{}", event.bucket, event.prefix),
         overwrite: false,

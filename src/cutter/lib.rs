@@ -24,10 +24,15 @@ pub struct Config {
     pub s3_region: String,
     pub s3_prefix: String,
     pub tmp_dir: String,
+    pub verbose: bool,
 }
 
 pub fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
+
+    if config.verbose {
+        explain_config(config);
+    }
 
     if !Path::new(&config.tmp_dir).exists() {
         fs::create_dir(&config.tmp_dir).unwrap();
@@ -43,7 +48,7 @@ pub fn run(config: &Config) {
     println!("Finding files in {}", &config.files_path);
     let files = get_files_in_dir(&config.files_path);
 
-    let processed_files = transform_images(files, &config.files_path);
+    let processed_files = transform_images(files, &config.files_path, config.verbose);
 
     if config.s3_bucket_name != "" {
         upload_to_s3(&config, processed_files);
@@ -57,6 +62,37 @@ pub fn run(config: &Config) {
 pub fn main() {
     let config = process_args();
     run(&config);
+}
+
+fn explain_config(config: &Config) {
+    println!("Explaining configuration: {:?}", config);
+
+    if config.s3_bucket_name != "" {
+        println!(
+            "Will publish files to S3 bucket '{}' after completion",
+            config.s3_bucket_name
+        );
+
+        println!("Will overwrite files on remote: {}", config.overwrite);
+    }
+
+    if config.fetch_remote {
+        println!(
+            "Fetching files from remote: {}/{}",
+            config.s3_bucket_name, config.s3_prefix
+        );
+    } else {
+        println!(
+            "Path to source files locally on this host: {}",
+            config.files_path
+        );
+    }
+
+    println!("Working/temporary directory: {}", config.tmp_dir);
+
+    if config.clean {
+        println!("Will clean working directory before starting");
+    }
 }
 
 // App config
@@ -100,6 +136,13 @@ fn process_args() -> Config {
                 .takes_value(true)
                 .help("Whether to overwrite files already present on the remote or not"),
         )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .takes_value(false)
+                .help("Print verbose output to stdout"),
+        )
         .get_matches();
 
     let tmp_dir = "/tmp/cutter";
@@ -109,6 +152,7 @@ fn process_args() -> Config {
     let s3_prefix = process_arg_with_default(matches.value_of("s3-prefix"), "");
     let fetch_remote = process_arg_with_default(matches.value_of("fetch-remote"), "") == "true";
     let overwrite = process_arg_with_default(matches.value_of("overwrite"), "") == "true";
+    let verbose = matches.is_present("verbose");
 
     if local_path == "" && (fetch_remote && s3_bucket == "") {
         panic!("Missing required arguments to run.");
@@ -134,6 +178,7 @@ fn process_args() -> Config {
         s3_prefix: s3_prefix.to_owned(),
         s3_region: DEFAULT_REGION.to_owned(),
         tmp_dir: "/tmp/cutter".to_owned(),
+        verbose: verbose,
     };
     return config;
 }
@@ -218,7 +263,7 @@ fn download_from_s3(config: &Config) {
         if gallery_image.len() > 1 {
             path = format!("{}/{}", &config.files_path, &gallery_image[1]);
         }
-        print_list_iter_status(counter, numfiles as u32, "Downloaded");
+        print_list_iter_status(counter, numfiles as u32, "Downloaded", config.verbose);
         let (data, _) = &bucket.get(&file).unwrap();
         let mut buffer = File::create(&path.to_owned()).unwrap();
         buffer.write(data).unwrap();
@@ -243,7 +288,7 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
     let mut counter = 0;
     let numfiles = files.len();
     for file in &files {
-        print_list_iter_status(counter, numfiles as u32, "Uploaded");
+        print_list_iter_status(counter, numfiles as u32, "Uploaded", config.verbose);
         let mut buf = Vec::new();
         File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
         // @ToDo: Fix output if files are served locally.
@@ -256,7 +301,7 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
     }
 }
 
-fn transform_images(files: Vec<String>, output_path: &str) -> Vec<String> {
+fn transform_images(files: Vec<String>, output_path: &str, verbose: bool) -> Vec<String> {
     let numfiles = files.len().to_owned();
     println!("Processing {} files", numfiles);
 
@@ -273,7 +318,7 @@ fn transform_images(files: Vec<String>, output_path: &str) -> Vec<String> {
 
     let mut counter = 0;
     for f in files {
-        print_list_iter_status(counter, numfiles as u32, "Processed");
+        print_list_iter_status(counter, numfiles as u32, "Processed", verbose);
         for size in &sizes {
             let width = size[0];
             let height = size[1];
@@ -335,10 +380,12 @@ fn get_files_in_dir(dirpath: &str) -> Vec<String> {
     return files;
 }
 
-fn print_list_iter_status(current: u32, len: u32, prefix: &str) {
+fn print_list_iter_status(current: u32, len: u32, prefix: &str, verbose: bool) {
     let total = len;
     let threshold = cmp::max(1, cmp::min(25, len * 25 / 100));
-    if current == 0 || current == total || current % threshold == 0 {
+    if verbose {
+        println!("{} {}/{}", prefix, current, total);
+    } else if current == 0 || current == total || current % threshold == 0 {
         println!("{} {}/{}", prefix, current, total);
     }
 }

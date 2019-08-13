@@ -45,6 +45,7 @@ fn lambda_handler(event: LambdaEvent, _context: Context) -> Result<LambdaOutput,
         s3_prefix: path,
         s3_region: DEFAULT_REGION.to_owned(),
         tmp_dir: format!("/tmp/{}", event.bucket),
+        verbose: true,
     };
 
     run(&config);

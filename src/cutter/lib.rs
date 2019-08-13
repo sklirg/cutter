@@ -305,7 +305,7 @@ fn download_from_s3(config: &Config) {
         skipped
     );
     let numfiles = files.len();
-    let mut counter = 0;
+    let mut counter = 1;
 
     if Path::new(&root_dir).exists() && (config.clean || config.overwrite) {
         println!("Removing existing directory...");
@@ -341,7 +341,7 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
         files.len(),
         &config.s3_bucket_name
     );
-    let mut counter = 0;
+    let mut counter = 1;
     let numfiles = files.len();
     for file in &files {
         print_list_iter_status(counter, numfiles as u32, "Uploaded", config.verbose);
@@ -368,7 +368,7 @@ fn transform_images(
 
     let mut created_files = Vec::new();
 
-    let mut counter = 0;
+    let mut counter = 1;
     for f in files {
         print_list_iter_status(counter, numfiles as u32, "Processing", verbose);
         for size in sizes {

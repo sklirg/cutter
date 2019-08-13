@@ -50,12 +50,8 @@ pub fn run(config: &Config) {
     println!("Finding files in {}", &config.files_path);
     let files = get_files_in_dir(&config.files_path);
 
-    let processed_files = transform_images(
-        files,
-        &config.files_path,
-        &config.crop_sizes,
-        config.verbose,
-    );
+    let processed_files =
+        transform_images(files, &config.tmp_dir, &config.crop_sizes, config.verbose);
 
     if config.s3_bucket_name != "" {
         upload_to_s3(&config, processed_files);

@@ -370,7 +370,7 @@ fn transform_images(
 
     let mut counter = 0;
     for f in files {
-        print_list_iter_status(counter, numfiles as u32, "Processed", verbose);
+        print_list_iter_status(counter, numfiles as u32, "Processing", verbose);
         for size in sizes {
             let width = size[0];
             let height = size[1];

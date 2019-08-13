@@ -126,6 +126,7 @@ fn process_args() -> Config {
                 .short("p")
                 .long("path")
                 .takes_value(true)
+                .conflicts_with("fetch-remote")
                 .help("Local file path of gallery to generate crops for"),
         )
         .arg(
@@ -139,21 +140,23 @@ fn process_args() -> Config {
             Arg::with_name("fetch-remote")
                 .short("r")
                 .long("fetch-remote")
-                .takes_value(true)
-                .help("Fetch images from S3 bucket specified in --s3-bucket")
-                .default_value("false"),
+                .takes_value(false)
+                .requires("s3-bucket")
+                .conflicts_with("path")
+                .help("Fetch images from S3 bucket specified in --s3-bucket"),
         )
         .arg(
             Arg::with_name("s3-prefix")
                 .long("s3-prefix")
                 .takes_value(true)
+                .requires("s3-bucket")
                 .help("Used to filter the start of the s3 object key"),
         )
         .arg(
             Arg::with_name("overwrite")
                 .short("o")
                 .long("overwrite")
-                .takes_value(true)
+                .takes_value(false)
                 .help("Whether to overwrite files already present on the remote or not"),
         )
         .arg(
@@ -178,8 +181,8 @@ fn process_args() -> Config {
     let local_path = process_arg_with_default(matches.value_of("path"), tmp_dir);
     let s3_bucket = process_arg_with_default(matches.value_of("s3-bucket"), "");
     let s3_prefix = process_arg_with_default(matches.value_of("s3-prefix"), "");
-    let fetch_remote = process_arg_with_default(matches.value_of("fetch-remote"), "") == "true";
-    let overwrite = process_arg_with_default(matches.value_of("overwrite"), "") == "true";
+    let fetch_remote = matches.is_present("fetch-remote");
+    let overwrite = matches.is_present("overwrite");
     let verbose = matches.is_present("verbose");
     let mut crop_sizes = Vec::new();
 

@@ -73,6 +73,8 @@ pub fn main() {
 fn explain_config(config: &Config) {
     println!("Explaining configuration: {:?}", config);
 
+    println!("*************** CONFIGURATION ***************");
+
     if config.s3_bucket_name != "" {
         println!(
             "Will publish files to S3 bucket '{}' after completion",
@@ -107,6 +109,8 @@ fn explain_config(config: &Config) {
     for size in &config.crop_sizes {
         println!("\t{:?}", size);
     }
+
+    println!("*************** END CONFIGURATION ***************");
 }
 
 // App config

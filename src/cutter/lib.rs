@@ -347,9 +347,9 @@ fn upload_to_s3(config: &Config, files: Vec<String>) {
         // @ToDo: Fix output if files are served locally.
         // They're currently prefixed with the folder name sent in through config
         // But need the prefix from S3.
-        bucket
-            .put(&file.replace(&config.tmp_dir, ""), &buf, "image/jpeg")
-            .unwrap();
+        let file_name = &file.replace(&config.tmp_dir, "");
+        let s3_file_path = format!("{}/{}", &config.s3_prefix, &file_name);
+        bucket.put(&s3_file_path, &buf, "image/jpeg").unwrap();
         counter += 1;
     }
 }

@@ -1,5 +1,4 @@
-pub mod config;
-mod imageprocessing;
+pub mod imageprocessing;
 pub mod lib;
-mod s3;
-mod util;
+pub mod s3;
+pub mod util;

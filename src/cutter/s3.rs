@@ -7,22 +7,27 @@ use std::str;
 use s3::bucket::Bucket;
 use s3::credentials::Credentials;
 
-use super::config::Config;
 use super::util::print_list_iter_status;
 
-pub fn download_from_s3(config: &Config) {
+pub fn download_from_s3(
+    bucket: &str,
+    region: &str,
+    prefix: &str,
+    local_path: &str,
+    overwrite: bool,
+    clean: bool,
+    verbose: bool,
+) {
     println!(
         "Downloading files from S3 bucket '{}' ({})...",
-        &config.s3_bucket_name, &config.s3_prefix
+        bucket, prefix
     );
     let credentials = Credentials::default();
-    let bucket = Bucket::new(
-        &config.s3_bucket_name,
-        config.s3_region.parse().unwrap(),
-        credentials,
-    )
-    .unwrap();
-    let bucket_contents = bucket.list(&config.s3_prefix, None).unwrap();
+    let region = region
+        .parse()
+        .expect("failed to convert region to valid aws region");
+    let bucket = Bucket::new(bucket, region, credentials).unwrap();
+    let bucket_contents = bucket.list(prefix, None).unwrap();
 
     let mut all_files = Vec::new();
 
@@ -49,17 +54,17 @@ pub fn download_from_s3(config: &Config) {
 
         let thumb_key = &file.replace(".jpg", "_thumb.jpg");
 
-        let valid_file_name = file != "" && file != &format!("{}/", &config.s3_prefix);
+        let valid_file_name = file != "" && file != &format!("{}/", prefix);
         let has_sizes = file.contains("_");
 
-        if valid_file_name && (config.overwrite || (!config.overwrite && !has_sizes)) {
+        if valid_file_name && (overwrite || (!overwrite && !has_sizes)) {
             files.push(file);
         } else {
             skipped += 1;
         }
     }
 
-    let root_dir = config.files_path.to_owned();
+    let root_dir = local_path;
 
     println!(
         "Downloading {} files to {} (skipped {})",
@@ -70,7 +75,7 @@ pub fn download_from_s3(config: &Config) {
     let numfiles = files.len();
     let mut counter = 1;
 
-    if Path::new(&root_dir).exists() && (config.clean || config.overwrite) {
+    if Path::new(&root_dir).exists() && (clean || overwrite) {
         println!("Removing existing directory...");
         fs::remove_dir_all(&root_dir).unwrap();
     }
@@ -78,11 +83,11 @@ pub fn download_from_s3(config: &Config) {
 
     for file in &files {
         let gallery_image: Vec<&str> = file.split("/").collect();
-        let mut path = format!("{}/{}", &config.files_path, &file);
+        let mut path = format!("{}/{}", local_path, &file);
         if gallery_image.len() > 1 {
-            path = format!("{}/{}", &config.files_path, &gallery_image[1]);
+            path = format!("{}/{}", local_path, &gallery_image[1]);
         }
-        print_list_iter_status(counter, numfiles as u32, "Downloaded", config.verbose);
+        print_list_iter_status(counter, numfiles as u32, "Downloaded", verbose);
         let (data, _) = &bucket.get(&file).unwrap();
         let mut buffer = File::create(&path.to_owned()).unwrap();
         buffer.write(data).unwrap();
@@ -90,31 +95,36 @@ pub fn download_from_s3(config: &Config) {
     }
 }
 
-pub fn upload_to_s3(config: &Config, files: Vec<String>) {
+pub fn upload_to_s3(
+    bucket: &str,
+    region: &str,
+    prefix: &str,
+    tmp_dir: &str,
+    files: Vec<String>,
+    verbose: bool,
+) {
     let credentials = Credentials::default();
-    let bucket = Bucket::new(
-        &config.s3_bucket_name,
-        config.s3_region.parse().unwrap(),
-        credentials,
-    )
-    .unwrap();
+    let region = region
+        .parse()
+        .expect("failed to convert region to valid aws region");
+    let bucket = Bucket::new(bucket, region, credentials).unwrap();
 
     println!(
         "Uploading {} files to S3 bucket '{}'",
         files.len(),
-        &config.s3_bucket_name
+        bucket.name,
     );
     let mut counter = 1;
     let numfiles = files.len();
     for file in &files {
-        print_list_iter_status(counter, numfiles as u32, "Uploaded", config.verbose);
+        print_list_iter_status(counter, numfiles as u32, "Uploaded", verbose);
         let mut buf = Vec::new();
         File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
         // @ToDo: Fix output if files are served locally.
         // They're currently prefixed with the folder name sent in through config
         // But need the prefix from S3.
-        let file_name = &file.replace(&config.tmp_dir, "");
-        let s3_file_path = format!("{}/{}", &config.s3_prefix, &file_name);
+        let file_name = &file.replace(tmp_dir, "");
+        let s3_file_path = format!("{}/{}", prefix, &file_name);
         bucket.put(&s3_file_path, &buf, "image/jpeg").unwrap();
         counter += 1;
     }

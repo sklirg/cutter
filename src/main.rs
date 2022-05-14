@@ -48,7 +48,7 @@ pub fn run(config: &Config) {
         fs::create_dir(&config.tmp_dir).unwrap();
     }
 
-    if config.fetch_remote && config.s3_bucket_name != "" {
+    if config.fetch_remote && !config.s3_bucket_name.is_empty() {
         download_from_s3(
             &config.s3_bucket_name,
             &config.s3_region,
@@ -66,7 +66,7 @@ pub fn run(config: &Config) {
     let processed_files =
         transform_images(files, &config.tmp_dir, &config.crop_sizes, config.verbose);
 
-    if config.s3_bucket_name != "" {
+    if !config.s3_bucket_name.is_empty() {
         upload_to_s3(
             &config.s3_bucket_name,
             &config.s3_region,
@@ -85,7 +85,7 @@ fn explain_config(config: &Config) {
 
     println!("*************** CONFIGURATION ***************");
 
-    if config.s3_bucket_name != "" {
+    if !config.s3_bucket_name.is_empty() {
         println!(
             "Will publish files to S3 bucket '{}' after completion",
             config.s3_bucket_name
@@ -207,19 +207,19 @@ fn process_args() -> Config {
     }
 
     for size in _crop_sizes_options {
-        if !size.contains("x") || size.split("x").collect::<Vec<&str>>().len() != 2 {
+        if !size.contains('x') || size.split('x').count() != 2 {
             panic!("Invalid sizes configuration. Use the expected format: WIDTHxHEIGHT, e.g.: 1920x1080");
         }
 
-        let height_str = size.split("x").collect::<Vec<&str>>()[1];
-        let width_str = size.split("x").collect::<Vec<&str>>()[0];
+        let height_str = size.split('x').collect::<Vec<&str>>()[1];
+        let width_str = size.split('x').collect::<Vec<&str>>()[0];
 
         let height: i32 = height_str.parse().unwrap();
         let width: i32 = width_str.parse().unwrap();
         crop_sizes.push([width, height]);
     }
 
-    if local_path == "" && (fetch_remote && s3_bucket == "") {
+    if local_path.is_empty() && (fetch_remote && s3_bucket.is_empty()) {
         panic!("Missing required arguments to run.");
     }
 
@@ -227,8 +227,8 @@ fn process_args() -> Config {
 
     if fetch_remote {
         let mut prefix_path = s3_prefix.to_owned();
-        if prefix_path.contains("/") {
-            let splits: Vec<&str> = prefix_path.split("/").collect::<Vec<&str>>();
+        if prefix_path.contains('/') {
+            let splits: Vec<&str> = prefix_path.split('/').collect::<Vec<&str>>();
             prefix_path = splits[0].to_owned();
         }
         files_path = format!("{}/{}", files_path, prefix_path);
@@ -237,21 +237,21 @@ fn process_args() -> Config {
     let config: Config = Config {
         clean: true,
         crop_sizes: crop_sizes.to_vec(),
-        fetch_remote: fetch_remote,
-        files_path: files_path.to_owned(),
-        overwrite: overwrite,
+        fetch_remote,
+        files_path,
+        overwrite,
         s3_bucket_name: s3_bucket,
-        s3_prefix: s3_prefix.to_owned(),
+        s3_prefix,
         s3_region: DEFAULT_REGION.to_owned(),
         tmp_dir: "/tmp/cutter".to_owned(),
-        verbose: verbose,
+        verbose,
     };
-    return config;
+    config
 }
 
 fn process_arg_with_default(arg: Option<&str>, default: &str) -> String {
     match arg {
-        None => return default.to_owned(),
-        Some(s) => return s.to_owned(),
-    };
+        None => default.to_owned(),
+        Some(s) => s.to_owned(),
+    }
 }

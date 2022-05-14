@@ -36,15 +36,15 @@ pub fn transform_images(
         counter += 1;
     }
 
-    return created_files;
+    created_files
 }
 
 fn transform_image(path: &str, width: i32, height: i32) -> raster::Image {
     let mut image = raster::open(path).unwrap();
     raster::transform::resize_fill(&mut image, width, height).unwrap();
-    return image;
+    image
 }
 
 pub fn save_image(image: &raster::Image, path: &str) {
-    raster::save(&image, &path).unwrap();
+    raster::save(image, path).unwrap();
 }

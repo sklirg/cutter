@@ -52,12 +52,12 @@ pub fn download_from_s3(
             continue;
         }
 
-        let thumb_key = &file.replace(".jpg", "_thumb.jpg");
+        let _thumb_key = &file.replace(".jpg", "_thumb.jpg");
 
-        let valid_file_name = file != "" && file != &format!("{}/", prefix);
-        let has_sizes = file.contains("_");
+        let valid_file_name = !file.is_empty() && file != &format!("{}/", prefix);
+        let has_sizes = file.contains('_');
 
-        if valid_file_name && (overwrite || (!overwrite && !has_sizes)) {
+        if valid_file_name && overwrite || !has_sizes {
             files.push(file);
         } else {
             skipped += 1;
@@ -82,15 +82,15 @@ pub fn download_from_s3(
     fs::create_dir_all(&root_dir).unwrap();
 
     for file in &files {
-        let gallery_image: Vec<&str> = file.split("/").collect();
+        let gallery_image: Vec<&str> = file.split('/').collect();
         let mut path = format!("{}/{}", local_path, &file);
         if gallery_image.len() > 1 {
             path = format!("{}/{}", local_path, &gallery_image[1]);
         }
         print_list_iter_status(counter, numfiles as u32, "Downloaded", verbose);
-        let (data, _) = &bucket.get(&file).unwrap();
-        let mut buffer = File::create(&path.to_owned()).unwrap();
-        buffer.write(data).unwrap();
+        let (data, _) = &bucket.get(file).unwrap();
+        let mut buffer = File::create(path).unwrap();
+        buffer.write_all(data).unwrap();
         counter += 1;
     }
 }

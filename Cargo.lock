@@ -349,7 +349,6 @@ name = "cutter"
 version = "0.3.0"
 dependencies = [
  "clap",
- "lambda_runtime",
  "raster",
  "rust-s3",
  "serde",
@@ -716,79 +715,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lambda_runtime"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb6f5263f79e29c69b349c6cd906381674871a03625a04fbcb686af363a7cd03"
-dependencies = [
- "failure",
- "lambda_runtime_core",
- "log 0.4.6",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "lambda_runtime_client"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aeecd7fe8331642af52f39f62f762605e1dd5a62e7f288b2bb939b7cc7fb7544"
-dependencies = [
- "failure",
- "http",
- "hyper",
- "lambda_runtime_errors",
- "log 0.4.6",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "lambda_runtime_core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "754758eccf7a245db273db7255cdc461e28332cf78591fec738f335e940eaa2c"
-dependencies = [
- "backtrace",
- "chrono",
- "failure",
- "hyper",
- "lambda_runtime_client",
- "lambda_runtime_errors",
- "log 0.4.6",
- "rustc_version",
- "tokio",
-]
-
-[[package]]
-name = "lambda_runtime_errors"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc65224e35e9f86514394e8c4db27f3f0fce02a40b0f2d7d54b0f1528c0a606"
-dependencies = [
- "failure",
- "lambda_runtime_errors_derive",
- "log 0.4.6",
- "serde_json",
-]
-
-[[package]]
-name = "lambda_runtime_errors_derive"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6eebda5e30caceb2702acf511b4744a2c624599a87477452ffd2d369936f35c0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "synstructure",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -927,17 +853,6 @@ dependencies = [
  "net2",
  "slab",
  "winapi 0.2.8",
-]
-
-[[package]]
-name = "mio-uds"
-version = "0.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
-dependencies = [
- "iovec",
- "libc",
- "mio",
 ]
 
 [[package]]
@@ -1734,30 +1649,13 @@ dependencies = [
  "futures",
  "mio",
  "num_cpus",
- "tokio-codec",
  "tokio-current-thread",
  "tokio-executor",
- "tokio-fs",
  "tokio-io",
  "tokio-reactor",
- "tokio-sync",
- "tokio-tcp",
  "tokio-threadpool",
  "tokio-timer",
  "tokio-trace-core",
- "tokio-udp",
- "tokio-uds",
-]
-
-[[package]]
-name = "tokio-codec"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c501eceaf96f0e1793cf26beb63da3d11c738c4a943fdf3746d81d64684c39f"
-dependencies = [
- "bytes",
- "futures",
- "tokio-io",
 ]
 
 [[package]]
@@ -1778,17 +1676,6 @@ checksum = "83ea44c6c0773cc034771693711c35c677b4b5a4b21b9e7071704c54de7d555e"
 dependencies = [
  "crossbeam-utils 0.6.5",
  "futures",
-]
-
-[[package]]
-name = "tokio-fs"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fe6dc22b08d6993916647d108a1a7d15b9cd29c4f4496c62b92c45b5041b7af"
-dependencies = [
- "futures",
- "tokio-io",
- "tokio-threadpool",
 ]
 
 [[package]]
@@ -1881,39 +1768,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "350c9edade9830dc185ae48ba45667a445ab59f6167ef6d0254ec9d2430d9dd3"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "tokio-udp"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
-dependencies = [
- "bytes",
- "futures",
- "log 0.4.6",
- "mio",
- "tokio-codec",
- "tokio-io",
- "tokio-reactor",
-]
-
-[[package]]
-name = "tokio-uds"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
-dependencies = [
- "bytes",
- "futures",
- "iovec",
- "libc",
- "log 0.4.6",
- "mio",
- "mio-uds",
- "tokio-codec",
- "tokio-io",
- "tokio-reactor",
 ]
 
 [[package]]

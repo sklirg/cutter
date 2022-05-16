@@ -2,7 +2,7 @@
 name = "cutter"
 version = "0.5.0"
 authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [[bin]]
 path = "src/main.rs"

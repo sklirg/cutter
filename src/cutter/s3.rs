@@ -106,7 +106,7 @@ pub async fn upload_to_s3(
     bucket: &str,
     _region: &str,
     prefix: &str,
-    tmp_dir: &str,
+    _tmp_dir: &str,
     files: Vec<String>,
     verbose: bool,
 ) {
@@ -125,7 +125,13 @@ pub async fn upload_to_s3(
         // @ToDo: Fix output if files are served locally.
         // They're currently prefixed with the folder name sent in through config
         // But need the prefix from S3.
-        let file_name = &file.replace(tmp_dir, "");
+        let file_name = Path::new(file)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+
         let s3_file_path = format!("{}/{}", prefix, &file_name);
         client
             .put_object()

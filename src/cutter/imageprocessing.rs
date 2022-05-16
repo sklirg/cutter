@@ -13,45 +13,60 @@ pub async fn transform_images(
     sizes: &Vec<[u32; 2]>,
     verbose: bool,
 ) -> Vec<String> {
-    let numfiles = files.len().to_owned();
-    println!("Processing {} files", numfiles);
+    let numfiles = files.len();
+    let operations = numfiles * sizes.len();
+    println!("Processing {} files, {} operations", numfiles, operations);
 
-    let mut created_files = Vec::new();
-
-    let mut counter = 1;
+    let mut tasks = Vec::new();
     for f in files {
-        print_list_iter_status(counter, numfiles as u32, "Processing", verbose);
         for size in sizes {
             let width = size[0];
             let height = size[1];
 
-            let fp = f.to_owned();
+            let ff = f.to_owned();
             let op = output_path.to_owned();
 
-            let thumb_path = format!(
-                "{}/{}",
-                op,
-                generate_thumb_path(&get_file_name(&fp.to_owned()), width, height, "jpg")
-            );
-            let thumb_path2 = thumb_path.to_owned();
-            match tokio::spawn(async move {
-                let image = match transform_image(&fp, width, height) {
+            let task: tokio::task::JoinHandle<Result<String, _>> = tokio::spawn(async move {
+                let thumb_path = format!(
+                    "{}/{}",
+                    op,
+                    generate_thumb_path(&get_file_name(&ff.to_owned()), width, height, "jpg")
+                );
+                let image = match transform_image(&ff, width, height) {
                     Ok(i) => i,
                     Err(err) => {
                         println!("transform error: {:?}", err);
-                        return;
+                        return Err("a");
                     }
                 };
 
-                save_image(&image, &thumb_path2);
-            }).await {
-                Ok(()) => (),
-                Err(err) => println!("failed to spawn task: {}", err),
-            };
+                save_image(&image, &thumb_path);
+                Ok(thumb_path)
+            });
 
-            created_files.push(thumb_path);
+            tasks.push(task);
         }
-        counter += 1;
+    }
+
+    let mut created_files = Vec::new();
+    let mut counter = 1;
+    for task in tasks.into_iter() {
+        print_list_iter_status(counter, operations as u32, "Processing", verbose);
+        match task.await {
+            Ok(res) => {
+                let path = match res {
+                    Ok(p) => p,
+                    Err(err) => {
+                        println!("task result err: {}", err);
+                        continue;
+                    }
+                };
+
+                counter += 1;
+                created_files.push(path);
+            }
+            Err(err) => println!("task panicked: {}", err),
+        };
     }
 
     created_files

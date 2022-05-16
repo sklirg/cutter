@@ -17,12 +17,17 @@ pub fn get_file_name(path: &str) -> String {
         .to_owned();
 }
 
-pub fn get_files_in_dir(dirpath: &str) -> Vec<String> {
-    let dir = Path::new(dirpath);
+pub fn get_files_in_dir(dirpath: String) -> Vec<String> {
+    let dir = Path::new(&dirpath);
     let mut files = Vec::new();
     if dir.is_dir() {
         for entry in fs::read_dir(dir).unwrap() {
-            let filename = entry.unwrap().path().to_str().unwrap().to_owned();
+            let filename = entry
+                .unwrap()
+                .path()
+                .into_os_string()
+                .into_string()
+                .unwrap();
             // Skip filenames with _ in them as that's used to denote file sizes/formats.
             // !! The 400D shot images with names IMG_num so they won't work with this :D
             if !filename.contains('_') {

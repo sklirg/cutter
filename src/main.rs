@@ -31,14 +31,14 @@ pub struct Config {
 #[tokio::main]
 pub async fn main() {
     let config = process_args();
-    run(&config).await;
+    run(config).await;
 }
 
-pub async fn run(config: &Config) {
+pub async fn run(config: Config) {
     println!("Executing with config: {:?}", config);
 
     if config.verbose {
-        explain_config(config);
+        explain_config(&config);
     }
 
     if Path::new(&config.tmp_dir).exists() && (config.clean || config.overwrite) {
@@ -62,10 +62,15 @@ pub async fn run(config: &Config) {
     }
 
     println!("Finding files in {}", &config.files_path);
-    let files = get_files_in_dir(&config.files_path);
+    let files = get_files_in_dir(config.files_path);
 
-    let processed_files =
-        transform_images(files, config.tmp_dir.to_owned(), &config.crop_sizes, config.verbose).await;
+    let processed_files = transform_images(
+        files,
+        config.tmp_dir.to_owned(),
+        &config.crop_sizes,
+        config.verbose,
+    )
+    .await;
 
     if !config.s3_bucket_name.is_empty() {
         upload_to_s3(

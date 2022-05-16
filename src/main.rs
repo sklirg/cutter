@@ -23,7 +23,7 @@ pub struct Config {
     pub s3_bucket_name: String,
     pub s3_region: String,
     pub s3_prefix: String,
-    pub crop_sizes: Vec<[i32; 2]>,
+    pub crop_sizes: Vec<[u32; 2]>,
     pub tmp_dir: String,
     pub verbose: bool,
 }
@@ -214,8 +214,8 @@ fn process_args() -> Config {
         let height_str = size.split('x').collect::<Vec<&str>>()[1];
         let width_str = size.split('x').collect::<Vec<&str>>()[0];
 
-        let height: i32 = height_str.parse().unwrap();
-        let width: i32 = width_str.parse().unwrap();
+        let height: u32 = height_str.parse().unwrap();
+        let width: u32 = width_str.parse().unwrap();
         crop_sizes.push([width, height]);
     }
 

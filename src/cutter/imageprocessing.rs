@@ -1,14 +1,16 @@
 use std::str;
 
+use image::io::Reader as ImageReader;
+
 use super::util::{generate_thumb_path, get_file_name, print_list_iter_status};
 
 extern crate clap;
-extern crate raster;
+extern crate image;
 
 pub fn transform_images(
     files: Vec<String>,
     output_path: &str,
-    sizes: &Vec<[i32; 2]>,
+    sizes: &Vec<[u32; 2]>,
     verbose: bool,
 ) -> Vec<String> {
     let numfiles = files.len().to_owned();
@@ -22,7 +24,13 @@ pub fn transform_images(
         for size in sizes {
             let width = size[0];
             let height = size[1];
-            let image = transform_image(&f, width, height);
+            let image = match transform_image(&f, width, height) {
+                Ok(i) => i,
+                Err(err) => {
+                    println!("transform error: {:?}", err);
+                    continue;
+                }
+            };
 
             let thumb_path = format!(
                 "{}/{}",
@@ -39,12 +47,30 @@ pub fn transform_images(
     created_files
 }
 
-fn transform_image(path: &str, width: i32, height: i32) -> raster::Image {
-    let mut image = raster::open(path).unwrap();
-    raster::transform::resize_fill(&mut image, width, height).unwrap();
-    image
+#[derive(Debug)]
+pub enum TransformError {
+    RasterError(String),
 }
 
-pub fn save_image(image: &raster::Image, path: &str) {
-    raster::save(image, path).unwrap();
+fn transform_image(
+    path: &str,
+    width: u32,
+    height: u32,
+) -> Result<image::DynamicImage, TransformError> {
+    let image_loader = match ImageReader::open(path) {
+        Ok(i) => i,
+        Err(err) => {
+            print!("err open: {:?}", err);
+            return Err(TransformError::RasterError(err.to_string()));
+        }
+    };
+    let image = match image_loader.decode() {
+        Ok(i) => i,
+        Err(err) => return Err(TransformError::RasterError(err.to_string())),
+    };
+    Ok(image.resize_to_fill(width, height, image::imageops::FilterType::Triangle))
+}
+
+pub fn save_image(image: &image::DynamicImage, path: &str) {
+    image.save(path).expect("failed to save image")
 }

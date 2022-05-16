@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::str;
 
-pub fn generate_thumb_path(path: &str, w: i32, h: i32, path_suffix: &str) -> String {
+pub fn generate_thumb_path(path: &str, w: u32, h: u32, path_suffix: &str) -> String {
     return format!("{}_{}x{}px_{}w.{}", path, w, h, w, path_suffix);
 }
 

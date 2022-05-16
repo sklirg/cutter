@@ -1,6 +1,6 @@
 [package]
 name = "cutter"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Håkon Solbjørg <hlsolbjorg@gmail.com>"]
 edition = "2018"
 
@@ -13,3 +13,4 @@ clap = "2.33.0"
 image = "0.24.2"
 rust-s3 = "0.12.1"
 serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }

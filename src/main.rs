@@ -28,12 +28,13 @@ pub struct Config {
     pub verbose: bool,
 }
 
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
     let config = process_args();
-    run(&config);
+    run(&config).await;
 }
 
-pub fn run(config: &Config) {
+pub async fn run(config: &Config) {
     println!("Executing with config: {:?}", config);
 
     if config.verbose {
@@ -64,7 +65,7 @@ pub fn run(config: &Config) {
     let files = get_files_in_dir(&config.files_path);
 
     let processed_files =
-        transform_images(files, &config.tmp_dir, &config.crop_sizes, config.verbose);
+        transform_images(files, config.tmp_dir.to_owned(), &config.crop_sizes, config.verbose).await;
 
     if !config.s3_bucket_name.is_empty() {
         upload_to_s3(

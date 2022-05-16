@@ -7,9 +7,9 @@ use super::util::{generate_thumb_path, get_file_name, print_list_iter_status};
 extern crate clap;
 extern crate image;
 
-pub fn transform_images(
+pub async fn transform_images(
     files: Vec<String>,
-    output_path: &str,
+    output_path: String,
     sizes: &Vec<[u32; 2]>,
     verbose: bool,
 ) -> Vec<String> {
@@ -24,21 +24,31 @@ pub fn transform_images(
         for size in sizes {
             let width = size[0];
             let height = size[1];
-            let image = match transform_image(&f, width, height) {
-                Ok(i) => i,
-                Err(err) => {
-                    println!("transform error: {:?}", err);
-                    continue;
-                }
-            };
+
+            let fp = f.to_owned();
+            let op = output_path.to_owned();
 
             let thumb_path = format!(
                 "{}/{}",
-                output_path,
-                generate_thumb_path(&get_file_name(&f), width, height, "jpg")
+                op,
+                generate_thumb_path(&get_file_name(&fp.to_owned()), width, height, "jpg")
             );
+            let thumb_path2 = thumb_path.to_owned();
+            match tokio::spawn(async move {
+                let image = match transform_image(&fp, width, height) {
+                    Ok(i) => i,
+                    Err(err) => {
+                        println!("transform error: {:?}", err);
+                        return;
+                    }
+                };
 
-            save_image(&image, &thumb_path);
+                save_image(&image, &thumb_path2);
+            }).await {
+                Ok(()) => (),
+                Err(err) => println!("failed to spawn task: {}", err),
+            };
+
             created_files.push(thumb_path);
         }
         counter += 1;

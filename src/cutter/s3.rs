@@ -1,17 +1,14 @@
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::Path;
 use std::str;
 
-use s3::bucket::Bucket;
-use s3::credentials::Credentials;
-
 use super::util::print_list_iter_status;
 
-pub fn download_from_s3(
+pub async fn download_from_s3(
     bucket: &str,
-    region: &str,
+    _region: &str,
     prefix: &str,
     local_path: &str,
     overwrite: bool,
@@ -22,19 +19,21 @@ pub fn download_from_s3(
         "Downloading files from S3 bucket '{}' ({})...",
         bucket, prefix
     );
-    let credentials = Credentials::default();
-    let region = region
-        .parse()
-        .expect("failed to convert region to valid aws region");
-    let bucket = Bucket::new(bucket, region, credentials).unwrap();
-    let bucket_contents = bucket.list(prefix, None).unwrap();
+    let config = aws_config::load_from_env().await;
+    let client = aws_sdk_s3::Client::new(&config);
+
+    let resp = client
+        .list_objects_v2()
+        .bucket(bucket)
+        .send()
+        .await
+        .expect("failed to send s3 request");
+    let bucket_contents = resp.contents().unwrap_or_default();
 
     let mut all_files = Vec::new();
 
-    for (list, _) in bucket_contents {
-        for obj in list.contents {
-            all_files.push(obj.key);
-        }
+    for obj in bucket_contents {
+        all_files.push(obj.key().expect("failed to get object key"));
     }
 
     let mut files = Vec::new();
@@ -88,44 +87,54 @@ pub fn download_from_s3(
             path = format!("{}/{}", local_path, &gallery_image[1]);
         }
         print_list_iter_status(counter, numfiles as u32, "Downloaded", verbose);
-        let (data, _) = &bucket.get(file).unwrap();
+
+        let resp = client
+            .get_object()
+            .bucket(bucket)
+            .key(file.to_string())
+            .send()
+            .await
+            .expect("failed to download file");
+        let data = resp.body.collect().await.expect("failed to collect data");
         let mut buffer = File::create(path).unwrap();
-        buffer.write_all(data).unwrap();
+        buffer.write_all(&data.into_bytes()).unwrap();
         counter += 1;
     }
 }
 
-pub fn upload_to_s3(
+pub async fn upload_to_s3(
     bucket: &str,
-    region: &str,
+    _region: &str,
     prefix: &str,
     tmp_dir: &str,
     files: Vec<String>,
     verbose: bool,
 ) {
-    let credentials = Credentials::default();
-    let region = region
-        .parse()
-        .expect("failed to convert region to valid aws region");
-    let bucket = Bucket::new(bucket, region, credentials).unwrap();
+    let config = aws_config::load_from_env().await;
+    let client = aws_sdk_s3::Client::new(&config);
 
-    println!(
-        "Uploading {} files to S3 bucket '{}'",
-        files.len(),
-        bucket.name,
-    );
+    println!("Uploading {} files to S3 bucket '{}'", files.len(), bucket,);
+
     let mut counter = 1;
     let numfiles = files.len();
     for file in &files {
         print_list_iter_status(counter, numfiles as u32, "Uploaded", verbose);
-        let mut buf = Vec::new();
-        File::open(&file).unwrap().read_to_end(&mut buf).unwrap();
+        let body = aws_sdk_s3::types::ByteStream::from_path(Path::new(file))
+            .await
+            .expect("failed to read file contents");
         // @ToDo: Fix output if files are served locally.
         // They're currently prefixed with the folder name sent in through config
         // But need the prefix from S3.
         let file_name = &file.replace(tmp_dir, "");
         let s3_file_path = format!("{}/{}", prefix, &file_name);
-        bucket.put(&s3_file_path, &buf, "image/jpeg").unwrap();
+        client
+            .put_object()
+            .bucket(bucket)
+            .key(s3_file_path)
+            .body(body)
+            .send()
+            .await
+            .expect("failed to upload");
         counter += 1;
     }
 }

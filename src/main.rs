@@ -95,7 +95,8 @@ pub async fn run(config: Config) {
                     config.overwrite,
                     config.clean,
                     config.verbose,
-                );
+                )
+                .await;
             }
         }
     }
@@ -121,7 +122,8 @@ pub async fn run(config: Config) {
             &config.tmp_dir,
             processed_files,
             config.verbose,
-        );
+        )
+        .await;
     }
 
     println!("Done!");

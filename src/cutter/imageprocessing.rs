@@ -7,10 +7,23 @@ use super::util::{generate_thumb_path, get_file_name, print_list_iter_status};
 extern crate clap;
 extern crate image;
 
+#[derive(Debug)]
+pub struct Size(pub u32, pub u32);
+
+pub fn str_to_size(s: &str) -> Result<Size, String> {
+    let width: u32 = s.split('x').collect::<Vec<&str>>()[0]
+        .parse()
+        .expect("first elem should be a number");
+    let height: u32 = s.split('x').collect::<Vec<&str>>()[1]
+        .parse()
+        .expect("second elem should be a number");
+    Ok(Size(width, height))
+}
+
 pub async fn transform_images(
     files: Vec<String>,
     output_path: String,
-    sizes: &Vec<[u32; 2]>,
+    sizes: &Vec<Size>,
     verbose: bool,
 ) -> Vec<String> {
     let numfiles = files.len();
@@ -20,8 +33,8 @@ pub async fn transform_images(
     let mut tasks = Vec::new();
     for f in files {
         for size in sizes {
-            let width = size[0];
-            let height = size[1];
+            let width = size.0;
+            let height = size.1;
 
             let ff = f.to_owned();
             let op = output_path.to_owned();

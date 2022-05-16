@@ -2,9 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::str;
 
-use clap::{App, Arg};
+use clap::Parser;
 
-use cutter::imageprocessing::transform_images;
+use cutter::imageprocessing::{str_to_size, transform_images, Size};
 use cutter::s3::{download_from_s3, upload_to_s3};
 use cutter::util::get_files_in_dir;
 
@@ -13,24 +13,50 @@ mod cutter;
 extern crate clap;
 
 pub const DEFAULT_REGION: &str = "eu-central-1";
+const DEFAULT_CROP_SIZES: [&str; 4] = ["200x200", "400x400", "800x800", "1920x1080"];
 
-#[derive(Debug)]
+#[derive(Debug, Parser)]
 pub struct Config {
-    pub clean: bool,
-    pub fetch_remote: bool,
+    /// Path to files to run Cutter on.
+    /// Cannot be used if files are fetched from a remote.
+    #[clap(short = 'p', long = "path", conflicts_with = "fetch-remote")]
     pub files_path: String,
+
+    /// Sizes to crop into. Can be used multiple times.
+    /// format: WIDTHxHEIGHT
+    #[clap(short='s', parse(try_from_str=str_to_size), default_values=&DEFAULT_CROP_SIZES)]
+    pub crop_sizes: Vec<Size>,
+
+    /// Clean output directory before starting.
+    #[clap(short)]
+    pub clean: bool,
+    /// Overwrite existing files.
+    #[clap(short, long)]
     pub overwrite: bool,
-    pub s3_bucket_name: String,
-    pub s3_region: String,
-    pub s3_prefix: String,
-    pub crop_sizes: Vec<[u32; 2]>,
+    /// Tmp dir to store output files in.
+    #[clap(short, long, default_value = "/tmp/cutter")]
     pub tmp_dir: String,
+    /// Enable verbose output.
+    #[clap(short, long)]
     pub verbose: bool,
+
+    /// Name of S3 bucket to upload files to.
+    #[clap(short = 'b')]
+    pub s3_bucket_name: Option<String>,
+    /// Region of S3 bucket.
+    #[clap(long)]
+    pub s3_region: Option<String>,
+    /// Prefix for files uploaded to S3.
+    #[clap(long)]
+    pub s3_prefix: Option<String>,
+    /// Fetch files from S3 bucket for Cutting.
+    #[clap(short = 'r', long)]
+    pub fetch_remote: Option<bool>,
 }
 
 #[tokio::main]
 pub async fn main() {
-    let config = process_args();
+    let config = Config::parse();
     run(config).await;
 }
 
@@ -49,16 +75,29 @@ pub async fn run(config: Config) {
         fs::create_dir(&config.tmp_dir).unwrap();
     }
 
-    if config.fetch_remote && !config.s3_bucket_name.is_empty() {
-        download_from_s3(
-            &config.s3_bucket_name,
-            &config.s3_region,
-            &config.s3_prefix,
-            &config.files_path,
-            config.overwrite,
-            config.clean,
-            config.verbose,
-        );
+    if let Some(fetch_remote) = config.fetch_remote {
+        if config.s3_bucket_name.is_none() {
+            panic!("shouldnt happen because config cheks for this :)");
+        }
+        if fetch_remote {
+            if let Some(s3_bucket_name) = &config.s3_bucket_name {
+                download_from_s3(
+                    s3_bucket_name,
+                    &config
+                        .s3_region
+                        .to_owned()
+                        .unwrap_or_else(|| DEFAULT_REGION.to_string()),
+                    &config
+                        .s3_prefix
+                        .to_owned()
+                        .unwrap_or_else(|| "".to_string()),
+                    &config.files_path,
+                    config.overwrite,
+                    config.clean,
+                    config.verbose,
+                );
+            }
+        }
     }
 
     println!("Finding files in {}", &config.files_path);
@@ -72,11 +111,13 @@ pub async fn run(config: Config) {
     )
     .await;
 
-    if !config.s3_bucket_name.is_empty() {
+    if let Some(s3_bucket_name) = config.s3_bucket_name {
         upload_to_s3(
-            &config.s3_bucket_name,
-            &config.s3_region,
-            &config.s3_prefix,
+            &s3_bucket_name,
+            &config
+                .s3_region
+                .unwrap_or_else(|| DEFAULT_REGION.to_string()),
+            &config.s3_prefix.unwrap_or_else(|| "".to_string()),
             &config.tmp_dir,
             processed_files,
             config.verbose,
@@ -91,20 +132,26 @@ fn explain_config(config: &Config) {
 
     println!("*************** CONFIGURATION ***************");
 
-    if !config.s3_bucket_name.is_empty() {
+    if let Some(s3_bucket_name) = &config.s3_bucket_name {
         println!(
             "Will publish files to S3 bucket '{}' after completion",
-            config.s3_bucket_name
+            s3_bucket_name
         );
 
         println!("Will overwrite files on remote: {}", config.overwrite);
     }
 
-    if config.fetch_remote {
-        println!(
-            "Fetching files from remote: {}/{}",
-            config.s3_bucket_name, config.s3_prefix
-        );
+    if let Some(fetch_remote) = config.fetch_remote {
+        if fetch_remote {
+            println!(
+                "Fetching files from remote: {}/{}",
+                config
+                    .s3_bucket_name
+                    .as_ref()
+                    .expect("need s3 bucket name if going to fetch from remote"),
+                config.s3_prefix.as_ref().unwrap_or(&"".to_string())
+            );
+        }
     } else {
         println!(
             "Path to source files locally on this host: {}",
@@ -127,137 +174,4 @@ fn explain_config(config: &Config) {
     }
 
     println!("*************** END CONFIGURATION ***************");
-}
-
-// App config
-fn process_args() -> Config {
-    let default_crop_sizes = ["200x200", "400x400", "800x800", "1920x1080"];
-
-    let matches = App::new("Cutter")
-        .version("0.3.0")
-        .author("Sklirg")
-        .about("Image cropping tool")
-        .arg(
-            Arg::with_name("path")
-                .short("p")
-                .long("path")
-                .takes_value(true)
-                .conflicts_with("fetch-remote")
-                .help("Local file path of gallery to generate crops for"),
-        )
-        .arg(
-            Arg::with_name("s3-bucket")
-                .short("b")
-                .long("s3-bucket")
-                .takes_value(true)
-                .help("S3 bucket to sync files to (and fetch from, if --fetch-remote is specified"),
-        )
-        .arg(
-            Arg::with_name("fetch-remote")
-                .short("r")
-                .long("fetch-remote")
-                .takes_value(false)
-                .requires("s3-bucket")
-                .conflicts_with("path")
-                .help("Fetch images from S3 bucket specified in --s3-bucket"),
-        )
-        .arg(
-            Arg::with_name("s3-prefix")
-                .long("s3-prefix")
-                .takes_value(true)
-                .requires("s3-bucket")
-                .help("Used to filter the start of the s3 object key"),
-        )
-        .arg(
-            Arg::with_name("overwrite")
-                .short("o")
-                .long("overwrite")
-                .takes_value(false)
-                .help("Whether to overwrite files already present on the remote or not"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .takes_value(false)
-                .help("Print verbose output to stdout"),
-        )
-        .arg(
-            Arg::with_name("size")
-                .short("s")
-                .long("size")
-                .multiple(true)
-                .takes_value(true)
-                .help("Crop sizes specified as WxH (e.g. 200x200) (overrides defaults). Use the argument one time per crop size."),
-        )
-        .get_matches();
-
-    let tmp_dir = "/tmp/cutter";
-
-    let local_path = process_arg_with_default(matches.value_of("path"), tmp_dir);
-    let s3_bucket = process_arg_with_default(matches.value_of("s3-bucket"), "");
-    let s3_prefix = process_arg_with_default(matches.value_of("s3-prefix"), "");
-    let fetch_remote = matches.is_present("fetch-remote");
-    let overwrite = matches.is_present("overwrite");
-    let verbose = matches.is_present("verbose");
-    let mut crop_sizes = Vec::new();
-
-    let mut _crop_sizes_options = Vec::new();
-
-    if matches.is_present("size") {
-        for size in matches.values_of("size").unwrap() {
-            _crop_sizes_options.push(size);
-        }
-    } else {
-        _crop_sizes_options = default_crop_sizes.to_vec();
-    }
-
-    for size in _crop_sizes_options {
-        if !size.contains('x') || size.split('x').count() != 2 {
-            panic!("Invalid sizes configuration. Use the expected format: WIDTHxHEIGHT, e.g.: 1920x1080");
-        }
-
-        let height_str = size.split('x').collect::<Vec<&str>>()[1];
-        let width_str = size.split('x').collect::<Vec<&str>>()[0];
-
-        let height: u32 = height_str.parse().unwrap();
-        let width: u32 = width_str.parse().unwrap();
-        crop_sizes.push([width, height]);
-    }
-
-    if local_path.is_empty() && (fetch_remote && s3_bucket.is_empty()) {
-        panic!("Missing required arguments to run.");
-    }
-
-    let mut files_path = local_path;
-
-    if fetch_remote {
-        let mut prefix_path = s3_prefix.to_owned();
-        if prefix_path.contains('/') {
-            let splits: Vec<&str> = prefix_path.split('/').collect::<Vec<&str>>();
-            prefix_path = splits[0].to_owned();
-        }
-        files_path = format!("{}/{}", files_path, prefix_path);
-    }
-
-    let config: Config = Config {
-        clean: true,
-        crop_sizes: crop_sizes.to_vec(),
-        fetch_remote,
-        files_path,
-        overwrite,
-        s3_bucket_name: s3_bucket,
-        s3_prefix,
-        s3_region: DEFAULT_REGION.to_owned(),
-        tmp_dir: "/tmp/cutter".to_owned(),
-        verbose,
-    };
-    config
-}
-
-fn process_arg_with_default(arg: Option<&str>, default: &str) -> String {
-    match arg {
-        None => default.to_owned(),
-        Some(s) => s.to_owned(),
-    }
 }
